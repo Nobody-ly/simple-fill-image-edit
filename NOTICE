@@ -1,0 +1,12 @@
+Simple Fill Image Edit
+Copyright 2026 Nobody-ly
+
+This product includes adapted crop/restore helpers from Inpaint Anything:
+https://github.com/geekyutao/Inpaint-Anything
+Copyright 2023 Inpaint Anything contributors, licensed under Apache License 2.0.
+
+The vendored file is located at:
+third_party/inpaint_anything_mask_processing.py
+
+The copy removes unused plotting and demonstration code. The crop and restore
+algorithm remains attributable to the upstream project.

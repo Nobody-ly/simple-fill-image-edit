@@ -1,0 +1,33 @@
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.pytest-tmp/
+.coverage
+htmlcov/
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Runtime projects may contain user images, masks and provider responses.
+data/projects/*
+!data/projects/.gitkeep
+data/.secrets/
+outputs/
+runs/
+
+# Credentials and private keys must never be committed.
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+ssh_config
+credentials*.json
+secrets*.json

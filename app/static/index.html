@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Simple Fill · 语义局部重绘</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">S</span>
+      <div><strong>Simple Fill 语义局部重绘</strong><small>SAM3 · IMAGE EDIT · INPAINT ANYTHING</small></div>
+    </div>
+    <div class="project-title" id="projectTitle">尚未打开项目</div>
+    <div class="health" id="healthBadges">
+      <span class="badge muted"><i></i>正在检查运行环境</span>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <aside class="panel controls">
+      <section class="section new-project">
+        <div class="section-head"><h2>开始一张图</h2><span>自动保存</span></div>
+        <label class="field compact"><span>项目名称</span><input id="projectName" placeholder="例如：夏季海报局部调整"></label>
+        <input id="fileInput" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+        <button class="upload" id="uploadButton">
+          <span class="upload-icon">↥</span><span><b>上传原图</b><small>PNG / JPG / WEBP · 最高 200 MiB</small></span>
+        </button>
+      </section>
+
+      <section class="section disabled" id="editControls">
+        <div class="section-head"><h2>1 · 告诉我修改什么</h2><button class="text-button hidden" id="clearPoints">清空点</button></div>
+        <p class="hint">直接写对象名称，SAM3 会按语义理解完整目标，不需要手动画蒙版。</p>
+        <label class="field"><span>原图中的对象</span><input id="segmentPrompt" maxlength="32" placeholder="例如：人物手中的书、红色杯子"></label>
+        <button class="secondary full" id="segmentButton">识别并预览修改范围</button>
+        <div class="mask-summary" id="maskSummary"><span>尚未生成蒙版</span></div>
+        <div class="mask-role hidden" id="maskRoleControls">
+          <button class="role-target" id="setTargetMask">设为修改目标</button>
+          <button id="addProtectMask">加入前景保护</button>
+        </div>
+        <div class="layer-summary hidden" id="layerSummary"></div>
+      </section>
+
+      <section class="section disabled" id="actionControls">
+        <div class="section-head"><h2>2 · 想把它变成什么</h2></div>
+        <div class="action-grid">
+          <button class="action active" data-operation="fill"><span>✦</span><b>语义局部重绘</b><small>原生蒙版接口一次完成替换</small></button>
+        </div>
+        <label class="field prompt-field" id="promptField"><span>生成要求</span><textarea id="generationPrompt" rows="3" placeholder="例如：把书完整替换成一只被双手自然抱住的白色长毛猫，保持其他内容不变"></textarea></label>
+        <label class="field hidden" id="resultObjectField"><span>结果对象</span><input id="resultObjectPrompt" maxlength="32"></label>
+        <div class="occlusion-summary hidden" id="occlusionSummary"></div>
+        <details class="advanced">
+          <summary><span>边缘与专业设置</span><small>默认通常最好</small></summary>
+          <label class="field"><span>新对象可用空间</span><select id="growthMode"><option value="0.35" selected>自动 · 推荐</option><option value="0.12">接近原对象大小</option><option value="0.65">更大范围</option></select></label>
+          <label class="range-field"><span>清除旧边缘 <output id="dilationOutput">6 px</output></span><input id="dilation" type="range" min="0" max="24" value="6"></label>
+          <label class="range-field"><span>最外侧接缝 <output id="featherOutput">3 px</output></span><input id="feather" type="range" min="0" max="8" value="3"></label>
+          <label class="range-field hidden"><span>旧物清理外扩 <output id="cleanupRadiusOutput">10 px</output></span><input id="cleanupRadius" type="range" min="0" max="24" value="10"></label>
+          <label class="range-field hidden"><span>语义软边宽度 <output id="semanticEdgeOutput">6 px</output></span><input id="semanticEdge" type="range" min="0" max="16" value="6"></label>
+          <button class="text-button protect-clear hidden" id="clearProtection" type="button">清空全部前景保护</button>
+          <p>“自动”会按旧对象大小额外留出生成空间；图像编辑模型一次完成清除和生成，范围外保持原图。</p>
+        </details>
+        <div class="v2-contract"><i></i><span>固定函数链路</span><b>SAM3 → Native Mask Edit → 原位回填</b></div>
+        <button class="primary full" id="generateButton"><span>生成局部修改</span><small id="generateProvider">原生 mask 图像编辑</small></button>
+      </section>
+    </aside>
+
+    <section class="stage-column">
+      <div class="stage-toolbar">
+        <div class="source-label"><i></i><span id="sourceLabel">等待图片</span></div>
+        <div class="stage-actions">
+          <button id="showSource" disabled>查看源图</button>
+          <button id="fitCanvas" disabled>适合窗口</button>
+          <a id="downloadCurrent" class="button-link disabled">下载当前图</a>
+        </div>
+      </div>
+      <div class="stage" id="stage">
+        <div class="empty-state" id="emptyState">
+          <div class="empty-glyph"><span></span></div>
+          <h1>说出图中的对象，<br>只修改你想改的部分。</h1>
+          <p>写出原图对象，再告诉图像编辑模型想把它变成什么。</p>
+        </div>
+        <canvas id="stageCanvas" class="hidden"></canvas>
+        <div class="stage-note hidden" id="stageNote">点图添加选择点</div>
+      </div>
+      <div class="task-progress hidden" id="taskProgress">
+        <div class="progress-copy"><span id="taskStage">准备任务</span><strong id="taskPercent">0%</strong></div>
+        <div class="progress-track"><i id="progressBar"></i></div>
+        <p id="taskDetail">任务记录与中间文件会持续保存，可以切换项目后再回来查看。</p>
+      </div>
+      <div class="filmstrip">
+        <div class="filmstrip-head"><h3>本项目版本</h3><span><b id="versionCount">0 个结果</b> · 点击任一版本继续编辑</span></div>
+        <div class="version-list" id="versionList"><p class="quiet">完成一次修改后，结果会出现在这里。</p></div>
+      </div>
+    </section>
+
+    <aside class="panel library">
+      <div class="library-head"><h2>项目</h2><button class="icon-button" id="refreshProjects" title="刷新">↻</button></div>
+      <label class="search"><span>⌕</span><input id="projectSearch" placeholder="搜索项目"></label>
+      <div class="project-list" id="projectList"></div>
+      <div class="tasks-head"><h2>任务记录</h2><span>成功与失败都会保留</span></div>
+      <div class="task-list" id="taskList"><p class="quiet">还没有任务记录。</p></div>
+    </aside>
+  </main>
+
+  <div class="toast" id="toast"></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

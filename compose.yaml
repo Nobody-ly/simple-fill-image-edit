@@ -1,0 +1,10 @@
+services:
+  simple-fill:
+    build: .
+    ports:
+      - "7862:7862"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped

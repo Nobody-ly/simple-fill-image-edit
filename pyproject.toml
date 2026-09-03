@@ -1,0 +1,12 @@
+[project]
+name = "simple-fill-image-edit"
+version = "1.0.0"
+description = "Semantic local image editing with SAM3, native-mask image editing, and Inpaint Anything crop restoration."
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "Apache-2.0"}
+authors = [{name = "Nobody-ly"}]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
