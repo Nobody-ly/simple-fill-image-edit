@@ -77,13 +77,13 @@ Content-Type: application/json
   "mask_id": "mask_xxx",
   "prompt": "把书替换成一只被双手抱住的白色长毛猫",
   "dilation": 6,
-  "growth_ratio": 0,
+  "growth_ratio": 0.15,
   "feather": 3,
   "pipeline_mode": "simple_fill"
 }
 ```
 
-使用用户框选蒙版时推荐 `growth_ratio: 0`，因为矩形已经表达全部可生成空间；`dilation: 6` 仍会额外清理紧贴边界的旧轮廓。使用 SAM3 对象蒙版时可保留 `growth_ratio: 0.35`。
+使用用户框选蒙版时推荐 `growth_ratio: 0.15`，避免比旧对象更大的耳朵、镜框或装饰边缘在回填时被裁断；文字替换等严格区域可使用 `0`。`dilation: 6` 仍会额外清理紧贴边界的旧轮廓。使用 SAM3 对象蒙版时可保留 `growth_ratio: 0.35`。
 
 提交立即返回任务，后台线程继续执行。轮询：
 

@@ -57,13 +57,13 @@
         <div class="occlusion-summary hidden" id="occlusionSummary"></div>
         <details class="advanced">
           <summary><span>边缘与专业设置</span><small>默认通常最好</small></summary>
-          <label class="field"><span>新对象可用空间</span><select id="growthMode"><option value="0">使用框选范围</option><option value="0.35" selected>自动 · 推荐</option><option value="0.12">接近原对象大小</option><option value="0.65">更大范围</option></select></label>
+          <label class="field"><span>新对象可用空间</span><select id="growthMode"><option value="0.15" selected>自动安全留白 · 推荐</option><option value="0">严格限制在框内</option><option value="0.35">明显更大的新对象</option><option value="0.65">超大生成范围</option></select></label>
           <label class="range-field"><span>清除旧边缘 <output id="dilationOutput">6 px</output></span><input id="dilation" type="range" min="0" max="24" value="6"></label>
           <label class="range-field"><span>最外侧接缝 <output id="featherOutput">3 px</output></span><input id="feather" type="range" min="0" max="8" value="3"></label>
           <label class="range-field hidden"><span>旧物清理外扩 <output id="cleanupRadiusOutput">10 px</output></span><input id="cleanupRadius" type="range" min="0" max="24" value="10"></label>
           <label class="range-field hidden"><span>语义软边宽度 <output id="semanticEdgeOutput">6 px</output></span><input id="semanticEdge" type="range" min="0" max="16" value="6"></label>
           <button class="text-button protect-clear hidden" id="clearProtection" type="button">清空全部前景保护</button>
-          <p>“自动”会按旧对象大小额外留出生成空间；图像编辑模型一次完成清除和生成，范围外保持原图。</p>
+          <p>“自动安全留白”会在框外预留约 15% 空间，避免猫耳、镜框等新内容被裁断；文字替换等严格区域可选择“严格限制在框内”。</p>
         </details>
         <div class="v2-contract"><i></i><span>固定函数链路</span><b>框选 / SAM3 → Native Mask Edit → 原位回填</b></div>
         <button class="primary full" id="generateButton"><span>生成局部修改</span><small id="generateProvider">原生 mask 图像编辑</small></button>

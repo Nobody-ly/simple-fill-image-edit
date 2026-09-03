@@ -234,6 +234,7 @@ def create_region(project_id: str, request: RegionRequest):
                 "provider": "manual-region-mask",
                 "input_mode": "rectangle",
                 "sam3_used": False,
+                "recommended_growth_ratio": 0.15,
             },
         }
         project["masks"].insert(0, record)

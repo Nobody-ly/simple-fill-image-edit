@@ -79,7 +79,9 @@ async function openProject(projectId) {
   syncSegmentInputMode();
   if (remembered) {
     const provider = remembered.provider?.provider || remembered.provider;
-    $("#growthMode").value = provider === "manual-region-mask" ? "0" : "0.35";
+    $("#growthMode").value = provider === "manual-region-mask"
+      ? String(remembered.provider?.recommended_growth_ratio ?? .15)
+      : "0.35";
   }
   $("#projectTitle").textContent = state.project.name;
   $("#editControls").classList.remove("disabled");
@@ -402,8 +404,8 @@ $("#directRegionButton").onclick = async () => {
       method: "POST", headers: {"Content-Type": "application/json"},
       body: JSON.stringify({box: state.selectionBox, label: $("#segmentPrompt").value.trim(), source_ref: state.sourceRef}),
     });
-    await acceptMask(mask, "框选范围预览", 0);
-    toast("已直接使用框选范围；未调用 SAM3");
+    await acceptMask(mask, "框选范围预览", .15);
+    toast("已使用框选并预留安全生成边界；未调用 SAM3");
   } catch (error) { toast(error.message, true); }
   finally { button.disabled = false; button.textContent = "直接使用框选"; }
 };
