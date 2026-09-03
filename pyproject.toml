@@ -9,5 +9,5 @@ authors = [{name = "Nobody-ly"}]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q"
+addopts = "-q --basetemp=.pytest-tmp"
 pythonpath = ["."]

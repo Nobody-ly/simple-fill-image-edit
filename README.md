@@ -85,6 +85,7 @@ python run.py
 ## 文档
 
 - [快速上手](docs/quickstart.md)
+- [可直接复制的完整配置](docs/ready-to-run-config.md)
 - [完整链路与边界](docs/architecture.md)
 - [配置参考](docs/configuration.md)
 - [可直接使用的示例](docs/examples.md)
