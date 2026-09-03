@@ -1,6 +1,26 @@
 import numpy as np
 
-from app.compositor import build_simple_fill_mask, feathered_composite
+import pytest
+
+from app.compositor import build_simple_fill_mask, feathered_composite, rectangle_mask
+
+
+def test_rectangle_mask_uses_exact_full_resolution_box():
+    mask = rectangle_mask((120, 100), (25, 20, 75, 60))
+
+    assert mask.shape == (100, 120)
+    assert np.count_nonzero(mask) == 50 * 40
+    assert np.all(mask[20:60, 25:75] == 255)
+    assert np.count_nonzero(mask[:20]) == 0
+    assert np.count_nonzero(mask[:, :25]) == 0
+
+
+def test_rectangle_mask_clamps_to_image_and_rejects_tiny_regions():
+    mask = rectangle_mask((40, 30), (-20, -10, 12, 8))
+    assert np.count_nonzero(mask) == 12 * 8
+
+    with pytest.raises(ValueError, match="框选区域太小"):
+        rectangle_mask((40, 30), (10, 10, 12, 12))
 
 
 def test_mask_expansion_reserves_room_and_records_parameters():

@@ -10,6 +10,10 @@ const state = {
   targetMask: null,
   protectedMasks: [],
   points: [],
+  selectionBox: null,
+  selectionStart: null,
+  selecting: false,
+  stageMode: "source",
   pointLabel: 1,
   operation: "fill",
   canvasImage: null,
@@ -71,7 +75,12 @@ async function openProject(projectId) {
   state.targetMask = remembered;
   state.protectedMasks = [];
   state.points = [];
+  clearSelection(false);
   syncSegmentInputMode();
+  if (remembered) {
+    const provider = remembered.provider?.provider || remembered.provider;
+    $("#growthMode").value = provider === "manual-region-mask" ? "0" : "0.35";
+  }
   $("#projectTitle").textContent = state.project.name;
   $("#editControls").classList.remove("disabled");
   $("#actionControls").classList.toggle("disabled", !state.targetMask);
@@ -133,6 +142,7 @@ async function selectSource(sourceRef, url) {
   state.targetMask = null;
   state.protectedMasks = [];
   state.points = [];
+  clearSelection(false);
   syncSegmentInputMode();
   $("#actionControls").classList.add("disabled");
   await showImage(url || state.project.source_url, sourceRef === "source" ? "原始素材" : `基于版本 ${shortId(sourceRef)} 继续`);
@@ -154,8 +164,9 @@ async function persistLayerDraft() {
   } catch (error) { toast(`编辑草稿保存失败：${error.message}`, true); }
 }
 
-async function showImage(url, label, resetMask = false) {
+async function showImage(url, label, resetMask = false, stageMode = "source") {
   state.activeImageUrl = url;
+  state.stageMode = stageMode;
   const image = new Image();
   image.onload = () => {
     state.canvasImage = image;
@@ -192,20 +203,128 @@ function drawPoints() {
     ctx.fillStyle = "white"; ctx.font = `bold ${radius}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.fillText(String(index + 1), point.x, point.y + 1);
   });
+  if (state.selectionBox) drawSelectionBox(ctx, canvas, state.selectionBox);
+}
+
+function drawSelectionBox(ctx, canvas, box) {
+  const width = box.x_max - box.x_min;
+  const height = box.y_max - box.y_min;
+  if (width <= 0 || height <= 0) return;
+  ctx.save();
+  ctx.fillStyle = "rgba(17, 27, 23, .34)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(
+    state.canvasImage,
+    box.x_min, box.y_min, width, height,
+    box.x_min, box.y_min, width, height,
+  );
+  const line = Math.max(3, Math.min(canvas.width, canvas.height) * .006);
+  ctx.strokeStyle = "#16c693";
+  ctx.lineWidth = line;
+  ctx.setLineDash([line * 2.4, line * 1.4]);
+  ctx.strokeRect(box.x_min, box.y_min, width, height);
+  ctx.setLineDash([]);
+  ctx.fillStyle = "#16c693";
+  const handle = line * 1.8;
+  [[box.x_min, box.y_min], [box.x_max, box.y_min], [box.x_min, box.y_max], [box.x_max, box.y_max]].forEach(([x, y]) => {
+    ctx.fillRect(x - handle / 2, y - handle / 2, handle, handle);
+  });
+  ctx.restore();
+}
+
+function canvasPoint(event) {
+  const canvas = $("#stageCanvas");
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: Math.round((event.clientX - rect.left) * canvas.width / rect.width),
+    y: Math.round((event.clientY - rect.top) * canvas.height / rect.height),
+  };
+}
+
+function normalizedBox(a, b) {
+  const canvas = $("#stageCanvas");
+  return {
+    x_min: Math.max(0, Math.min(canvas.width, Math.min(a.x, b.x))),
+    y_min: Math.max(0, Math.min(canvas.height, Math.min(a.y, b.y))),
+    x_max: Math.max(0, Math.min(canvas.width, Math.max(a.x, b.x))),
+    y_max: Math.max(0, Math.min(canvas.height, Math.max(a.y, b.y))),
+  };
+}
+
+function syncSelectionSummary() {
+  const node = $("#selectionSummary");
+  const button = $("#directRegionButton");
+  const clear = $("#clearSelection");
+  if (!state.selectionBox) {
+    node.className = "selection-summary";
+    node.textContent = "尚未框选 · 拖动图片即可开始";
+    button.disabled = true;
+    clear.classList.add("hidden");
+    return;
+  }
+  const width = state.selectionBox.x_max - state.selectionBox.x_min;
+  const height = state.selectionBox.y_max - state.selectionBox.y_min;
+  node.className = "selection-summary ready";
+  node.textContent = `已框选 ${width}×${height} px · 可直接使用或智能贴边`;
+  button.disabled = width < 4 || height < 4;
+  clear.classList.remove("hidden");
+}
+
+function clearSelection(redraw = true) {
+  state.selectionBox = null;
+  state.selectionStart = null;
+  state.selecting = false;
+  syncSelectionSummary();
+  if (redraw) drawPoints();
 }
 
 function syncSegmentInputMode() {
   const input = $("#segmentPrompt");
-  const usingPoints = state.points.length > 0;
-  input.disabled = usingPoints;
-  input.title = usingPoints ? "当前使用点选模式；清空点后可改用名称选择" : "";
-  input.placeholder = usingPoints ? "当前按点选识别；清空点后可输入名称" : "例如：头发、人物、红色杯子";
+  input.disabled = false;
+  input.title = state.selectionBox ? "框选时，SAM3 会优先使用框的位置" : "";
+  input.placeholder = state.selectionBox ? "可选：为这次框选加个名称" : "例如：书、花瓶、眼镜";
 }
 
-$("#stageCanvas").addEventListener("click", event => {
-  if (!state.project || !state.canvasImage) return;
-  toast("这个实验版固定使用文字语义选择，请在左侧填写对象名称");
+$("#stageCanvas").addEventListener("pointerdown", async event => {
+  if (!state.project || !state.canvasImage || event.button !== 0) return;
+  if (state.stageMode !== "source") {
+    toast("已返回当前底图，请重新拖动框选");
+    await returnToSelectedSource();
+    return;
+  }
+  event.preventDefault();
+  const canvas = $("#stageCanvas");
+  canvas.setPointerCapture(event.pointerId);
+  state.selectionStart = canvasPoint(event);
+  state.selectionBox = normalizedBox(state.selectionStart, state.selectionStart);
+  state.selecting = true;
+  drawPoints();
 });
+
+$("#stageCanvas").addEventListener("pointermove", event => {
+  if (!state.selecting || !state.selectionStart) return;
+  event.preventDefault();
+  state.selectionBox = normalizedBox(state.selectionStart, canvasPoint(event));
+  drawPoints();
+  syncSelectionSummary();
+});
+
+$("#stageCanvas").addEventListener("pointerup", event => {
+  if (!state.selecting || !state.selectionStart) return;
+  event.preventDefault();
+  state.selectionBox = normalizedBox(state.selectionStart, canvasPoint(event));
+  state.selecting = false;
+  state.selectionStart = null;
+  syncSelectionSummary();
+  syncSegmentInputMode();
+  drawPoints();
+  if (!state.selectionBox || state.selectionBox.x_max - state.selectionBox.x_min < 4 || state.selectionBox.y_max - state.selectionBox.y_min < 4) {
+    clearSelection();
+    toast("框选太小，请按住拖动一个更大的区域", true);
+  }
+});
+
+$("#stageCanvas").addEventListener("pointercancel", () => clearSelection());
 
 $("#uploadButton").onclick = () => $("#fileInput").click();
 $("#fileInput").onchange = async event => {
@@ -259,29 +378,53 @@ $$('[data-point-label]').forEach(button => button.onclick = () => {
   $$('[data-point-label]').forEach(item => item.classList.remove("active"));
   button.classList.add("active"); state.pointLabel = Number(button.dataset.pointLabel);
 });
-$("#clearPoints").onclick = () => { state.points = []; syncSegmentInputMode(); drawPoints(); };
+$("#clearSelection").onclick = () => { clearSelection(); syncSegmentInputMode(); };
+
+async function acceptMask(mask, label, growthRatio) {
+  state.activeMask = mask;
+  state.targetMask = mask;
+  state.protectedMasks = [];
+  state.project = await api(`/api/projects/${state.project.id}`);
+  state.canvasImage = null;
+  $("#growthMode").value = String(growthRatio);
+  await showImage(mask.preview_url, label, false, "mask-preview");
+  $("#actionControls").classList.remove("disabled");
+  renderProject();
+  await persistLayerDraft();
+}
+
+$("#directRegionButton").onclick = async () => {
+  if (!state.selectionBox) return toast("请先在图片上拖动框选", true);
+  const button = $("#directRegionButton");
+  button.disabled = true; button.textContent = "正在保存框选…";
+  try {
+    const mask = await api(`/api/projects/${state.project.id}/regions`, {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({box: state.selectionBox, label: $("#segmentPrompt").value.trim(), source_ref: state.sourceRef}),
+    });
+    await acceptMask(mask, "框选范围预览", 0);
+    toast("已直接使用框选范围；未调用 SAM3");
+  } catch (error) { toast(error.message, true); }
+  finally { button.disabled = false; button.textContent = "直接使用框选"; }
+};
 
 $("#segmentButton").onclick = async () => {
   const prompt = $("#segmentPrompt").value.trim();
-  if (!state.points.length && !prompt) return toast("请先点一下目标，或填写目标名称", true);
+  if (!state.selectionBox && !prompt) return toast("请先拖动框选，或填写对象名称", true);
   const button = $("#segmentButton"); button.disabled = true; button.textContent = "SAM3 正在理解目标…";
   try {
     const mask = await api(`/api/projects/${state.project.id}/segment`, {
       method: "POST", headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({points: state.points, prompt, source_ref: state.sourceRef}),
+      body: JSON.stringify({
+        boxes: state.selectionBox ? [state.selectionBox] : [],
+        prompt: state.selectionBox ? "" : prompt,
+        source_ref: state.sourceRef,
+      }),
     });
-    state.activeMask = mask;
-    state.targetMask = mask;
-    state.protectedMasks = [];
-    state.project = await api(`/api/projects/${state.project.id}`);
-    state.canvasImage = null;
-    await showImage(mask.preview_url, "SAM3 蒙版预览");
-    $("#actionControls").classList.remove("disabled");
-    renderProject();
-    await persistLayerDraft();
-    toast("SAM3 已按语义选中目标，可以直接生成");
+    await acceptMask(mask, "SAM3 蒙版预览", .35);
+    toast(state.selectionBox ? "SAM3 已在框内贴合对象边缘" : "SAM3 已按名称识别目标");
   } catch (error) { toast(error.message, true); }
-  finally { button.disabled = false; button.textContent = "识别并预览修改范围"; }
+  finally { button.disabled = false; button.textContent = "SAM3 智能贴边"; }
 };
 
 $$('[data-operation]').forEach(button => button.onclick = () => {

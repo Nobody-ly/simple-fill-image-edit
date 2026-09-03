@@ -77,6 +77,12 @@ button.primary span, button.primary small { display: block; } button.primary sma
 button:disabled { opacity: .45; cursor: not-allowed; }
 .mask-summary { margin-top: 9px; padding: 9px 11px; background: #f0eee8; border-radius: 9px; color: var(--muted); font-size: 11px; }
 .mask-summary.ready { background: var(--emerald-soft); color: #086650; }
+.selection-summary { margin: 10px 0 4px; padding: 10px 11px; border: 1px dashed #b9b3a7; border-radius: 10px; color: var(--muted); background: #fbf8f1; font-size: 11px; }
+.selection-summary.ready { border-style: solid; border-color: #9acdbf; background: var(--emerald-soft); color: #086650; font-weight: 700; }
+.selection-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.selection-actions button { min-width: 0; padding-inline: 8px; }
+.selection-actions .direct-region:not(:disabled) { border-color: var(--emerald); color: var(--emerald); background: #f2fbf7; font-weight: 700; }
+.selection-footnote { margin-top: 7px; }
 .mask-role { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 8px; }
 .mask-role button { border: 1px solid var(--line); border-radius: 9px; background: white; padding: 9px 6px; font-size: 10px; cursor: pointer; }
 .mask-role .role-target { color: white; background: var(--emerald); border-color: var(--emerald); }
@@ -104,7 +110,7 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .source-label { display: flex; align-items: center; font-size: 12px; }.source-label i { width: 8px; height: 8px; background: var(--emerald); border-radius: 50%; margin-right: 8px; }
 .stage-actions { display: flex; gap: 6px; }.stage-actions button, .stage-actions .button-link { padding: 7px 10px; border: 1px solid var(--line); border-radius: 9px; background: #fff; font-size: 11px; }
 .stage { min-height: 0; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; background-color: #ebe9e3; background-image: linear-gradient(45deg,#e0ddd5 25%,transparent 25%),linear-gradient(-45deg,#e0ddd5 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#e0ddd5 75%),linear-gradient(-45deg,transparent 75%,#e0ddd5 75%); background-size: 24px 24px; background-position: 0 0,0 12px,12px -12px,-12px 0; }
-.stage canvas { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; box-shadow: 0 18px 60px rgba(18,28,24,.18); cursor: crosshair; }
+.stage canvas { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; box-shadow: 0 18px 60px rgba(18,28,24,.18); cursor: crosshair; touch-action: none; user-select: none; }
 .empty-state { max-width: 500px; text-align: center; padding: 30px; }.empty-state h1 { font: 700 34px/1.26 SimSun, "Songti SC", serif; }.empty-state p { color: var(--muted); margin-top: 15px; line-height: 1.7; font-size: 13px; }
 .empty-glyph { width: 86px; height: 86px; border: 1px solid #aab2ad; border-radius: 50%; margin: 0 auto 22px; display: grid; place-items: center; }.empty-glyph span { width: 23px; height: 23px; background: var(--emerald); border-radius: 50%; box-shadow: 26px -18px 0 -6px var(--coral), -22px 18px 0 -8px var(--ink); }
 .stage-note { position: absolute; left: 50%; bottom: 17px; transform: translateX(-50%); background: rgba(23,32,29,.88); color: white; padding: 8px 12px; border-radius: 999px; font-size: 10px; pointer-events: none; }

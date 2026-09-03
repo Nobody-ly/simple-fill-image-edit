@@ -13,13 +13,13 @@ from PIL import Image, ImageOps
 from pydantic import BaseModel, Field
 
 from . import storage
-from .compositor import mask_preview, read_rgb
+from .compositor import mask_preview, read_rgb, rectangle_mask
 from .config import settings
 from .pipeline import SimpleFillOptions, run_simple_fill
 from .sam3_wavespeed import segment as sam3_segment
 
 
-app = FastAPI(title="Simple Fill Image Edit", version="1.0.0")
+app = FastAPI(title="Simple Fill Image Edit", version="1.1.0")
 app.mount("/static", StaticFiles(directory=settings.root / "app" / "static"), name="static")
 app.mount("/media", StaticFiles(directory=settings.data_dir), name="media")
 executor = ThreadPoolExecutor(max_workers=settings.worker_count, thread_name_prefix="simple-fill")
@@ -42,6 +42,12 @@ class SegmentRequest(BaseModel):
     points: list[Point] = Field(default_factory=list)
     boxes: list[Box] = Field(default_factory=list)
     prompt: str = Field(default="", max_length=64)
+    source_ref: str = "source"
+
+
+class RegionRequest(BaseModel):
+    box: Box
+    label: str = Field(default="", max_length=64)
     source_ref: str = "source"
 
 
@@ -195,6 +201,53 @@ def segment(project_id: str, request: SegmentRequest):
         raise HTTPException(404, str(exc)) from exc
     except Exception as exc:
         raise HTTPException(502, f"SAM3 failed: {exc}") from exc
+
+
+@app.post("/api/projects/{project_id}/regions")
+def create_region(project_id: str, request: RegionRequest):
+    """Persist a user-approved rectangle as a mask without calling SAM3."""
+    try:
+        project = _project(project_id)
+        source = _source(project, request.source_ref)
+        with Image.open(source) as opened:
+            width, height = opened.size
+        box = request.box.model_dump()
+        mask = rectangle_mask(
+            (width, height),
+            (box["x_min"], box["y_min"], box["x_max"], box["y_max"]),
+        )
+        mask_id = storage.new_id("mask")
+        folder = storage.project_dir(project_id) / "masks"
+        Image.fromarray(mask).save(folder / f"{mask_id}.png")
+        Image.fromarray(mask_preview(read_rgb(source), mask)).save(
+            folder / f"{mask_id}-preview.png"
+        )
+        record = {
+            "id": mask_id,
+            "source_ref": request.source_ref,
+            "points": [],
+            "boxes": [box],
+            "prompt": request.label.strip() or "框选区域",
+            "coverage": round(float((mask > 0).mean()), 5),
+            "created_at": storage.now_iso(),
+            "provider": {
+                "provider": "manual-region-mask",
+                "input_mode": "rectangle",
+                "sam3_used": False,
+            },
+        }
+        project["masks"].insert(0, record)
+        project["active_mask_id"] = mask_id
+        storage.write_project(project)
+        return {
+            **record,
+            "url": f"/media/projects/{project_id}/masks/{mask_id}.png",
+            "preview_url": f"/media/projects/{project_id}/masks/{mask_id}-preview.png",
+        }
+    except FileNotFoundError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
 
 def _run_task(project_id: str, task_id: str) -> None:

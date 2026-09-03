@@ -43,7 +43,26 @@ Content-Type: application/json
 }
 ```
 
-成功返回 `mask_id`、覆盖率和蒙版预览地址。文字与空间提示不应混合；界面默认使用文字。
+成功返回 `mask_id`、覆盖率和蒙版预览地址。文字与空间提示不应混合：界面有框时发送 box，没有框时发送文字。
+
+## 直接框选蒙版
+
+不调用 SAM3，把用户在原图坐标系中确认的矩形直接保存为可编辑蒙版：
+
+```http
+POST /api/projects/{project_id}/regions
+Content-Type: application/json
+```
+
+```json
+{
+  "box": {"x_min": 390, "y_min": 530, "x_max": 650, "y_max": 820},
+  "label": "人物手中的书",
+  "source_ref": "source"
+}
+```
+
+返回记录的 `provider.provider` 为 `manual-region-mask`，`sam3_used` 为 `false`。坐标会裁切到图片边界，宽或高小于 4 px 的区域会被拒绝。
 
 ## 生成
 
@@ -58,11 +77,13 @@ Content-Type: application/json
   "mask_id": "mask_xxx",
   "prompt": "把书替换成一只被双手抱住的白色长毛猫",
   "dilation": 6,
-  "growth_ratio": 0.35,
+  "growth_ratio": 0,
   "feather": 3,
   "pipeline_mode": "simple_fill"
 }
 ```
+
+使用用户框选蒙版时推荐 `growth_ratio: 0`，因为矩形已经表达全部可生成空间；`dilation: 6` 仍会额外清理紧贴边界的旧轮廓。使用 SAM3 对象蒙版时可保留 `growth_ratio: 0.35`。
 
 提交立即返回任务，后台线程继续执行。轮询：
 
