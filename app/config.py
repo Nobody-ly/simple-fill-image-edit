@@ -24,6 +24,10 @@ class Settings:
     image_api_key: str = os.getenv("IMAGE_API_KEY", "").strip()
     image_model: str = os.getenv("IMAGE_MODEL", "gpt-image-2")
     image_field: str = os.getenv("IMAGE_FIELD", "image[]")
+    image_transport: str = os.getenv("IMAGE_API_TRANSPORT", "multipart").strip().lower()
+    image_auth_scheme: str = os.getenv("IMAGE_API_AUTH_SCHEME", "Bearer").strip()
+    image_route_header_name: str = os.getenv("IMAGE_ROUTE_HEADER_NAME", "").strip()
+    image_route_header_value: str = os.getenv("IMAGE_ROUTE_HEADER_VALUE", "").strip()
     image_timeout_seconds: int = int(os.getenv("IMAGE_TIMEOUT_SECONDS", "600"))
 
     wavespeed_base_url: str = os.getenv(

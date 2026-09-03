@@ -28,6 +28,25 @@ def _endpoint() -> str:
     raise RuntimeError("IMAGE_API_BASE_URL must use HTTPS; HTTP is allowed only for localhost")
 
 
+def _headers() -> dict[str, str]:
+    if settings.image_auth_scheme not in {"Bearer", "ApiKey"}:
+        raise RuntimeError("IMAGE_API_AUTH_SCHEME must be Bearer or ApiKey")
+    headers = {
+        "Authorization": f"{settings.image_auth_scheme} {settings.image_api_key}"
+    }
+    if settings.image_route_header_name or settings.image_route_header_value:
+        if not settings.image_route_header_name or not settings.image_route_header_value:
+            raise RuntimeError("IMAGE_ROUTE_HEADER_NAME and IMAGE_ROUTE_HEADER_VALUE must be set together")
+        if any(char in settings.image_route_header_name + settings.image_route_header_value for char in "\r\n"):
+            raise RuntimeError("image route header contains invalid characters")
+        headers[settings.image_route_header_name] = settings.image_route_header_value
+    return headers
+
+
+def _data_url(payload: bytes) -> str:
+    return "data:image/png;base64," + base64.b64encode(payload).decode("ascii")
+
+
 def build_alpha_mask(mask: np.ndarray) -> Image.Image:
     """Convert white=editable mask to transparent=editable RGBA mask."""
     binary = np.where(mask >= 127, 255, 0).astype(np.uint8)
@@ -98,22 +117,39 @@ def edit_image(
         "pose, perspective and lighting outside it. Blend the edited boundary naturally. "
     )
     progress("submitting native-mask image edit", 46)
-    response = requests.post(
-        _endpoint(),
-        headers={"Authorization": f"Bearer {settings.image_api_key}"},
-        data={
-            "model": settings.image_model,
-            "prompt": system_guard + "Target: " + prompt.strip(),
-            "size": f"{source_image.width}x{source_image.height}",
-            "quality": "high",
-            "output_format": "png",
-        },
-        files={
-            settings.image_field: ("source.png", source_buffer.getvalue(), "image/png"),
-            "mask": ("mask.png", mask_buffer.getvalue(), "image/png"),
-        },
-        timeout=settings.image_timeout_seconds,
-    )
+    request_prompt = system_guard + "Target: " + prompt.strip()
+    common = {
+        "model": settings.image_model,
+        "prompt": request_prompt,
+        "size": f"{source_image.width}x{source_image.height}",
+        "quality": "high",
+        "output_format": "png",
+    }
+    if settings.image_transport == "multipart":
+        response = requests.post(
+            _endpoint(),
+            headers=_headers(),
+            data=common,
+            files={
+                settings.image_field: ("source.png", source_buffer.getvalue(), "image/png"),
+                "mask": ("mask.png", mask_buffer.getvalue(), "image/png"),
+            },
+            timeout=settings.image_timeout_seconds,
+        )
+    elif settings.image_transport == "json-data-url":
+        response = requests.post(
+            _endpoint(),
+            headers={**_headers(), "Content-Type": "application/json"},
+            json={
+                **common,
+                "images": [{"image_url": _data_url(source_buffer.getvalue())}],
+                "mask": _data_url(mask_buffer.getvalue()),
+                "n": 1,
+            },
+            timeout=settings.image_timeout_seconds,
+        )
+    else:
+        raise RuntimeError("IMAGE_API_TRANSPORT must be multipart or json-data-url")
     output = output_dir / "image-edit-provider-original.png"
     _decode(response, output)
     progress("image edit completed", 82)
@@ -122,6 +158,8 @@ def edit_image(
         "model": settings.image_model,
         "request_id": response.headers.get("x-request-id"),
         "endpoint_origin": urlparse(_endpoint()).netloc,
+        "transport": settings.image_transport,
+        "auth_scheme": settings.image_auth_scheme,
         "mask_semantics": "transparent_pixels_are_editable",
         "crop_size": list(original_size),
         "provider_input_size": list(provider_size),

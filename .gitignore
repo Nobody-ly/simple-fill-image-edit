@@ -14,7 +14,9 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
-# Runtime projects may contain user images, masks and provider responses.
+# Runtime data may contain user images, masks and provider responses.
+data/*
+!data/projects/
 data/projects/*
 !data/projects/.gitkeep
 data/.secrets/

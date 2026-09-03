@@ -100,6 +100,7 @@ def health():
         "wavespeed_key_ready": settings.sam3_ready,
         "image_api_ready": settings.image_ready,
         "image_model": settings.image_model,
+        "image_transport": settings.image_transport,
     }
 
 

@@ -4,6 +4,8 @@ from pathlib import Path
 from typing import Any
 import json
 import mimetypes
+import shutil
+import subprocess
 import time
 
 import numpy as np
@@ -15,6 +17,24 @@ from .config import settings
 
 class WaveSpeedError(RuntimeError):
     pass
+
+
+def _curl_upload(path: Path, upload: dict[str, Any]) -> None:
+    """Fallback for hosts where Python/OpenSSL drops WaveSpeed's S3 PUT."""
+    executable = shutil.which("curl")
+    if not executable:
+        raise WaveSpeedError("curl is unavailable for the media-upload fallback")
+    method = str(upload.get("method", "PUT")).upper()
+    if method not in {"PUT", "POST"}:
+        raise WaveSpeedError(f"unsupported media upload method: {method}")
+    command = [executable, "--fail", "--silent", "--show-error", "--request", method]
+    for name, value in upload.get("headers", {}).items():
+        command.extend(["--header", f"{name}: {value}"])
+    command.extend(["--upload-file", str(path), upload["url"]])
+    completed = subprocess.run(command, capture_output=True, text=True, timeout=330)
+    if completed.returncode:
+        detail = completed.stderr.strip().replace("\n", " ")[:500]
+        raise WaveSpeedError(f"curl media upload failed: {detail or completed.returncode}")
 
 
 _PROMPT_ALIASES = {
@@ -60,15 +80,31 @@ def upload_image(path: Path) -> str:
         raise WaveSpeedError(body.get("message") or "创建上传票据失败")
     ticket = body["data"]
     upload = ticket["upload"]
-    with path.open("rb") as stream:
-        pushed = requests.request(
-            upload.get("method", "PUT"),
-            upload["url"],
-            headers=upload.get("headers", {}),
-            data=stream,
-            timeout=(10, 300),
-        )
-    pushed.raise_for_status()
+    last_error: Exception | None = None
+    for attempt in range(3):
+        try:
+            with path.open("rb") as stream:
+                pushed = requests.request(
+                    upload.get("method", "PUT"),
+                    upload["url"],
+                    headers=upload.get("headers", {}),
+                    data=stream,
+                    timeout=(10, 300),
+                )
+            pushed.raise_for_status()
+            last_error = None
+            break
+        except requests.RequestException as exc:
+            last_error = exc
+            if attempt < 2:
+                time.sleep(1.5 * (attempt + 1))
+    if last_error is not None:
+        try:
+            _curl_upload(path, upload)
+        except Exception as curl_error:
+            raise WaveSpeedError(
+                f"SAM3 media upload failed after requests and curl fallback: {curl_error}"
+            ) from last_error
     return ticket["download_url"]
 
 

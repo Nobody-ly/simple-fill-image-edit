@@ -10,6 +10,10 @@
 | `IMAGE_API_KEY` | 空 | Bearer Token，必填 |
 | `IMAGE_MODEL` | `gpt-image-2` | 服务端模型名 |
 | `IMAGE_FIELD` | `image[]` | multipart 中原图字段名；部分兼容层使用 `image` |
+| `IMAGE_API_TRANSPORT` | `multipart` | `multipart` 或 `json-data-url` |
+| `IMAGE_API_AUTH_SCHEME` | `Bearer` | `Bearer` 或 `ApiKey` |
+| `IMAGE_ROUTE_HEADER_NAME` | 空 | 可选的网关路由请求头名 |
+| `IMAGE_ROUTE_HEADER_VALUE` | 空 | 可选的网关路由请求头值；必须和请求头名同时设置 |
 | `IMAGE_TIMEOUT_SECONDS` | `600` | 请求总超时 |
 
 接口请求包含：
