@@ -4,8 +4,6 @@ from pathlib import Path
 from typing import Any
 import json
 import mimetypes
-import shutil
-import subprocess
 import time
 
 import numpy as np
@@ -17,24 +15,6 @@ from .config import settings
 
 class WaveSpeedError(RuntimeError):
     pass
-
-
-def _curl_upload(path: Path, upload: dict[str, Any]) -> None:
-    """Fallback for hosts where Python/OpenSSL drops WaveSpeed's S3 PUT."""
-    executable = shutil.which("curl")
-    if not executable:
-        raise WaveSpeedError("curl is unavailable for the media-upload fallback")
-    method = str(upload.get("method", "PUT")).upper()
-    if method not in {"PUT", "POST"}:
-        raise WaveSpeedError(f"unsupported media upload method: {method}")
-    command = [executable, "--fail", "--silent", "--show-error", "--request", method]
-    for name, value in upload.get("headers", {}).items():
-        command.extend(["--header", f"{name}: {value}"])
-    command.extend(["--upload-file", str(path), upload["url"]])
-    completed = subprocess.run(command, capture_output=True, text=True, timeout=330)
-    if completed.returncode:
-        detail = completed.stderr.strip().replace("\n", " ")[:500]
-        raise WaveSpeedError(f"curl media upload failed: {detail or completed.returncode}")
 
 
 _PROMPT_ALIASES = {
@@ -57,9 +37,15 @@ def _provider_prompt(value: str) -> str:
 
 
 def _api_key() -> str:
-    if not settings.wavespeed_api_key:
-        raise WaveSpeedError("WAVESPEED_API_KEY is not configured")
-    return settings.wavespeed_api_key
+    env = __import__("os").environ.get("WAVESPEED_API_KEY", "").strip()
+    if env:
+        return env
+    if not settings.wavespeed_key_file.is_file():
+        raise WaveSpeedError("未找到 WaveSpeed API Key 文件")
+    key = settings.wavespeed_key_file.read_text(encoding="utf-8").strip()
+    if not key:
+        raise WaveSpeedError("WaveSpeed API Key 文件为空")
+    return key
 
 
 def _headers() -> dict[str, str]:
@@ -69,7 +55,7 @@ def _headers() -> dict[str, str]:
 def upload_image(path: Path) -> str:
     mime = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
     response = requests.post(
-        f"{settings.wavespeed_base_url}/media/uploads",
+        f"{settings.wavespeed_base}/media/uploads",
         headers={**_headers(), "Content-Type": "application/json"},
         json={"filename": path.name, "size": path.stat().st_size, "content_type": mime},
         timeout=(10, 60),
@@ -80,31 +66,15 @@ def upload_image(path: Path) -> str:
         raise WaveSpeedError(body.get("message") or "创建上传票据失败")
     ticket = body["data"]
     upload = ticket["upload"]
-    last_error: Exception | None = None
-    for attempt in range(3):
-        try:
-            with path.open("rb") as stream:
-                pushed = requests.request(
-                    upload.get("method", "PUT"),
-                    upload["url"],
-                    headers=upload.get("headers", {}),
-                    data=stream,
-                    timeout=(10, 300),
-                )
-            pushed.raise_for_status()
-            last_error = None
-            break
-        except requests.RequestException as exc:
-            last_error = exc
-            if attempt < 2:
-                time.sleep(1.5 * (attempt + 1))
-    if last_error is not None:
-        try:
-            _curl_upload(path, upload)
-        except Exception as curl_error:
-            raise WaveSpeedError(
-                f"SAM3 media upload failed after requests and curl fallback: {curl_error}"
-            ) from last_error
+    with path.open("rb") as stream:
+        pushed = requests.request(
+            upload.get("method", "PUT"),
+            upload["url"],
+            headers=upload.get("headers", {}),
+            data=stream,
+            timeout=(10, 300),
+        )
+    pushed.raise_for_status()
     return ticket["download_url"]
 
 
@@ -244,7 +214,7 @@ def segment(image_path: Path, *, points: list[dict[str, int]],
         prompt_sent = _provider_prompt(prompt)[:32]
         payload["prompt"] = prompt_sent
     response = requests.post(
-        f"{settings.wavespeed_base_url}/wavespeed-ai/sam3-image-rle",
+        f"{settings.wavespeed_base}/wavespeed-ai/sam3-image-rle",
         headers={**_headers(), "Content-Type": "application/json"},
         json=payload,
         timeout=(10, 60),
@@ -259,7 +229,7 @@ def segment(image_path: Path, *, points: list[dict[str, int]],
     if not prediction_id:
         raise WaveSpeedError("SAM3 提交响应没有 prediction id")
     result_url = task.get("urls", {}).get("get") or (
-        f"{settings.wavespeed_base_url}/predictions/{prediction_id}/result"
+        f"{settings.wavespeed_base}/predictions/{prediction_id}/result"
     )
     deadline = time.monotonic() + timeout_seconds
     while True:
@@ -276,6 +246,11 @@ def segment(image_path: Path, *, points: list[dict[str, int]],
         task = _unwrap(polled.json())
 
     outputs = _resolve_outputs(task.get("outputs", []))
+    debug_path = settings.data_dir / "sam3-last-output.json"
+    try:
+        debug_path.write_text(json.dumps(outputs, ensure_ascii=False, indent=2), encoding="utf-8")
+    except (OSError, TypeError):
+        pass
     rles = _collect_rles(outputs, (width, height))
     masks = [_decode_rle(item) for item in rles]
     mask = _choose_mask(masks, points)

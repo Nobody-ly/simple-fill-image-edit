@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Simple Fill · 语义局部重绘</title>
+  <title>CatsCo 语义局部重绘 · Fill Anything</title>
   <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
   <header class="topbar">
     <div class="brand">
-      <span class="brand-mark">S</span>
-      <div><strong>Simple Fill 语义局部重绘</strong><small>SAM3 · IMAGE EDIT · INPAINT ANYTHING</small></div>
+      <span class="brand-mark">C</span>
+      <div><strong>CatsCo 语义局部重绘</strong><small>SAM3 · IMAGE2 · FILL ANYTHING</small></div>
     </div>
     <div class="project-title" id="projectTitle">尚未打开项目</div>
     <div class="health" id="healthBadges">
@@ -30,15 +30,10 @@
       </section>
 
       <section class="section disabled" id="editControls">
-        <div class="section-head"><h2>1 · 框住要修改的区域</h2><button class="text-button hidden" id="clearSelection">清除框选</button></div>
-        <p class="hint">在中间图片上按住拖动。默认直接使用框选范围；需要贴合物体轮廓时，再让 SAM3 智能处理。</p>
-        <div class="selection-summary" id="selectionSummary">尚未框选 · 拖动图片即可开始</div>
-        <label class="field"><span>对象名称 <em>可选，仅用于语义识别</em></span><input id="segmentPrompt" maxlength="64" placeholder="例如：书、花瓶、眼镜"></label>
-        <div class="selection-actions">
-          <button class="secondary direct-region" id="directRegionButton" disabled>直接使用框选</button>
-          <button class="secondary" id="segmentButton">SAM3 智能贴边</button>
-        </div>
-        <p class="hint selection-footnote">没有框时，也可以只输入对象名称，再点 SAM3 语义识别。</p>
+        <div class="section-head"><h2>1 · 告诉我修改什么</h2><button class="text-button hidden" id="clearPoints">清空点</button></div>
+        <p class="hint">直接写对象名称，SAM3 会按语义理解完整目标，不需要手动画蒙版。</p>
+        <label class="field"><span>原图中的对象</span><input id="segmentPrompt" maxlength="32" placeholder="例如：人物手中的书、红色杯子"></label>
+        <button class="secondary full" id="segmentButton">识别并预览修改范围</button>
         <div class="mask-summary" id="maskSummary"><span>尚未生成蒙版</span></div>
         <div class="mask-role hidden" id="maskRoleControls">
           <button class="role-target" id="setTargetMask">设为修改目标</button>
@@ -50,23 +45,23 @@
       <section class="section disabled" id="actionControls">
         <div class="section-head"><h2>2 · 想把它变成什么</h2></div>
         <div class="action-grid">
-          <button class="action active" data-operation="fill"><span>✦</span><b>语义局部重绘</b><small>原生蒙版接口一次完成替换</small></button>
+          <button class="action active" data-operation="fill"><span>✦</span><b>语义局部重绘</b><small>Image2 一次完成替换</small></button>
         </div>
         <label class="field prompt-field" id="promptField"><span>生成要求</span><textarea id="generationPrompt" rows="3" placeholder="例如：把书完整替换成一只被双手自然抱住的白色长毛猫，保持其他内容不变"></textarea></label>
         <label class="field hidden" id="resultObjectField"><span>结果对象</span><input id="resultObjectPrompt" maxlength="32"></label>
         <div class="occlusion-summary hidden" id="occlusionSummary"></div>
         <details class="advanced">
           <summary><span>边缘与专业设置</span><small>默认通常最好</small></summary>
-          <label class="field"><span>新对象可用空间</span><select id="growthMode"><option value="0.15" selected>自动安全留白 · 推荐</option><option value="0">严格限制在框内</option><option value="0.35">明显更大的新对象</option><option value="0.65">超大生成范围</option></select></label>
+          <label class="field"><span>新对象可用空间</span><select id="growthMode"><option value="0.35" selected>自动 · 推荐</option><option value="0.12">接近原对象大小</option><option value="0.65">更大范围</option></select></label>
           <label class="range-field"><span>清除旧边缘 <output id="dilationOutput">6 px</output></span><input id="dilation" type="range" min="0" max="24" value="6"></label>
           <label class="range-field"><span>最外侧接缝 <output id="featherOutput">3 px</output></span><input id="feather" type="range" min="0" max="8" value="3"></label>
           <label class="range-field hidden"><span>旧物清理外扩 <output id="cleanupRadiusOutput">10 px</output></span><input id="cleanupRadius" type="range" min="0" max="24" value="10"></label>
           <label class="range-field hidden"><span>语义软边宽度 <output id="semanticEdgeOutput">6 px</output></span><input id="semanticEdge" type="range" min="0" max="16" value="6"></label>
           <button class="text-button protect-clear hidden" id="clearProtection" type="button">清空全部前景保护</button>
-          <p>“自动安全留白”会在框外预留约 15% 空间，避免猫耳、镜框等新内容被裁断；文字替换等严格区域可选择“严格限制在框内”。</p>
+          <p>“自动”会按旧对象大小额外留出生成空间；Image2 一次完成清除和生成，范围外保持原图。</p>
         </details>
-        <div class="v2-contract"><i></i><span>固定函数链路</span><b>框选 / SAM3 → Native Mask Edit → 原位回填</b></div>
-        <button class="primary full" id="generateButton"><span>生成局部修改</span><small id="generateProvider">原生 mask 图像编辑</small></button>
+        <div class="v2-contract"><i></i><span>独立实验链路</span><b>SAM3 → Image2 → 原位回填</b></div>
+        <button class="primary full" id="generateButton"><span>生成局部修改</span><small id="generateProvider">Image2 · 原生 mask</small></button>
       </section>
     </aside>
 
@@ -82,11 +77,11 @@
       <div class="stage" id="stage">
         <div class="empty-state" id="emptyState">
           <div class="empty-glyph"><span></span></div>
-          <h1>框住一个区域，<br>只修改你想改的部分。</h1>
-          <p>上传图片后直接拖动框选；需要时再用 SAM3 智能贴边。</p>
+          <h1>说出图中的对象，<br>只修改你想改的部分。</h1>
+          <p>写出原图对象，再告诉 Image2 想把它变成什么。</p>
         </div>
         <canvas id="stageCanvas" class="hidden"></canvas>
-        <div class="stage-note hidden" id="stageNote">按住拖动框选 · 框外像素保持不变</div>
+        <div class="stage-note hidden" id="stageNote">点图添加选择点</div>
       </div>
       <div class="task-progress hidden" id="taskProgress">
         <div class="progress-copy"><span id="taskStage">准备任务</span><strong id="taskPercent">0%</strong></div>

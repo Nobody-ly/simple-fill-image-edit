@@ -1,51 +1,67 @@
-from __future__ import annotations
-
 from dataclasses import dataclass
 from pathlib import Path
 import os
 
-from dotenv import load_dotenv
-
 
 ROOT = Path(__file__).resolve().parent.parent
-load_dotenv(ROOT / ".env")
 
 
 @dataclass(frozen=True)
 class Settings:
     root: Path = ROOT
-    data_dir: Path = Path(os.getenv("SIMPLE_FILL_DATA", ROOT / "data"))
-    host: str = os.getenv("SIMPLE_FILL_HOST", "127.0.0.1")
-    port: int = int(os.getenv("SIMPLE_FILL_PORT", "7862"))
-
-    image_api_base_url: str = os.getenv(
-        "IMAGE_API_BASE_URL", "https://api.openai.com/v1"
+    data_dir: Path = Path(os.getenv("CATSCO_INPAINT_DATA", ROOT / "data"))
+    upstream_dir: Path = Path(os.getenv(
+        "INPAINT_ANYTHING_UPSTREAM",
+        r"D:\codex_workspace\catsco-inpaint-anything-2026-upstream",
+    ))
+    wavespeed_key_file: Path = Path(os.getenv(
+        "WAVESPEED_API_KEY_FILE",
+        ROOT / "data" / ".secrets" / "wavespeed-api-key.txt",
+    ))
+    wavespeed_base: str = "https://api.wavespeed.ai/api/v3"
+    ssh_host: str = os.getenv("CATSCO_IMAGE2_HOST", "203.32.85.223")
+    ssh_user: str = os.getenv("CATSCO_IMAGE2_USER", "root")
+    ssh_key: Path = Path(os.getenv(
+        "CATSCO_IMAGE2_SSH_KEY",
+        str(Path.home() / ".ssh" / "worker2_203_32_85_223_ed25519_v2"),
+    ))
+    remote_root: str = "/srv/catsco-agent"
+    remote_run_root: str = "/srv/catsco-agent/work/inpaint-anything-runs"
+    remote_node: str = "/srv/catsco-agent/tools/node-v24.18.0/bin/node"
+    remote_skill: str = "/srv/catsco-agent/skills/image-asset-generator"
+    masked_image2_base_url: str = os.getenv(
+        "CATSCO_MASKED_IMAGE2_BASE_URL", "https://api.openai.com/v1",
     ).rstrip("/")
-    image_api_key: str = os.getenv("IMAGE_API_KEY", "").strip()
-    image_model: str = os.getenv("IMAGE_MODEL", "gpt-image-2")
-    image_field: str = os.getenv("IMAGE_FIELD", "image[]")
-    image_transport: str = os.getenv("IMAGE_API_TRANSPORT", "multipart").strip().lower()
-    image_auth_scheme: str = os.getenv("IMAGE_API_AUTH_SCHEME", "Bearer").strip()
-    image_route_header_name: str = os.getenv("IMAGE_ROUTE_HEADER_NAME", "").strip()
-    image_route_header_value: str = os.getenv("IMAGE_ROUTE_HEADER_VALUE", "").strip()
-    image_timeout_seconds: int = int(os.getenv("IMAGE_TIMEOUT_SECONDS", "600"))
-
-    wavespeed_base_url: str = os.getenv(
-        "WAVESPEED_BASE_URL", "https://api.wavespeed.ai/api/v3"
-    ).rstrip("/")
-    wavespeed_api_key: str = os.getenv("WAVESPEED_API_KEY", "").strip()
-
-    max_upload_mib: int = int(os.getenv("MAX_UPLOAD_MIB", "200"))
-    max_image_pixels: int = int(os.getenv("MAX_IMAGE_PIXELS", "120000000"))
-    worker_count: int = int(os.getenv("SIMPLE_FILL_WORKERS", "3"))
+    masked_image2_api_key: str = os.getenv("CATSCO_MASKED_IMAGE2_API_KEY", "").strip()
+    masked_image2_api_key_file: Path | None = (
+        Path(os.environ["CATSCO_MASKED_IMAGE2_API_KEY_FILE"])
+        if os.getenv("CATSCO_MASKED_IMAGE2_API_KEY_FILE") else None
+    )
+    masked_image2_model: str = os.getenv("CATSCO_MASKED_IMAGE2_MODEL", "gpt-image-2")
+    masked_image2_timeout: int = int(os.getenv("CATSCO_MASKED_IMAGE2_TIMEOUT", "600"))
+    masked_image2_image_field: str = os.getenv(
+        "CATSCO_MASKED_IMAGE2_IMAGE_FIELD", "image[]",
+    )
+    host: str = os.getenv("CATSCO_INPAINT_HOST", "127.0.0.1")
+    port: int = int(os.getenv("CATSCO_INPAINT_PORT", "7862"))
 
     @property
-    def image_ready(self) -> bool:
-        return bool(self.image_api_key)
+    def lama_config(self) -> Path:
+        return self.upstream_dir / "lama" / "configs" / "prediction" / "default.yaml"
 
     @property
-    def sam3_ready(self) -> bool:
-        return bool(self.wavespeed_api_key)
+    def lama_checkpoint(self) -> Path:
+        return self.upstream_dir / "pretrained_models" / "big-lama"
+
+    @property
+    def masked_image2_key_ready(self) -> bool:
+        if self.masked_image2_api_key:
+            return True
+        return bool(
+            self.masked_image2_api_key_file
+            and self.masked_image2_api_key_file.is_file()
+            and self.masked_image2_api_key_file.stat().st_size > 0
+        )
 
 
 settings = Settings()

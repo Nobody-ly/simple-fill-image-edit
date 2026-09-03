@@ -1,1 +1,2 @@
-"""Simple Fill semantic local image-editing workbench."""
+"""CatsCo local Inpaint Anything workbench."""
+

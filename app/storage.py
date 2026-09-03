@@ -114,7 +114,7 @@ def create_task(project_id: str, operation: str, prompt: str, mask_id: str,
         "created_at": created,
         "updated_at": created,
         "error": None,
-        "provider": "openai-compatible-native-mask",
+        "provider": "lama" if operation == "remove" else "image2",
         "artifacts": {},
     }
     folder = project_dir(project_id) / "tasks" / task_id

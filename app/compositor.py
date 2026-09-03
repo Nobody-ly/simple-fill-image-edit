@@ -17,23 +17,6 @@ def read_mask(path: Path, size: tuple[int, int] | None = None) -> np.ndarray:
     return np.where(mask >= 127, 255, 0).astype(np.uint8)
 
 
-def rectangle_mask(
-    size: tuple[int, int], box: tuple[int, int, int, int], *, minimum_edge: int = 4,
-) -> np.ndarray:
-    """Build a deterministic full-resolution mask from a user-drawn rectangle."""
-    width, height = size
-    x_min, y_min, x_max, y_max = (int(value) for value in box)
-    x_min = max(0, min(width, x_min))
-    x_max = max(0, min(width, x_max))
-    y_min = max(0, min(height, y_min))
-    y_max = max(0, min(height, y_max))
-    if x_max - x_min < minimum_edge or y_max - y_min < minimum_edge:
-        raise ValueError("框选区域太小，请重新拖动框选")
-    mask = np.zeros((height, width), dtype=np.uint8)
-    mask[y_min:y_max, x_min:x_max] = 255
-    return mask
-
-
 def dilate(mask: np.ndarray, kernel_size: int) -> np.ndarray:
     """Match upstream Inpaint Anything's square-kernel mask dilation."""
     if kernel_size <= 0:
@@ -183,3 +166,9 @@ def mask_preview(original: np.ndarray, mask: np.ndarray) -> np.ndarray:
     color[:, :, 2] = 142
     alpha = (mask.astype(np.float32) / 255.0 * 0.58)[:, :, None]
     return np.clip(original * (1.0 - alpha) + color * alpha, 0, 255).astype(np.uint8)
+
+
+def image2_mask_guide(mask: np.ndarray) -> np.ndarray:
+    guide = np.zeros((mask.shape[0], mask.shape[1], 3), dtype=np.uint8)
+    guide[mask > 0] = (255, 255, 255)
+    return guide

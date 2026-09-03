@@ -3,33 +3,16 @@
 !.env.example
 .venv/
 venv/
+data/
+tmp/
+output/
+*.key
+*.pem
+*.p12
+*.pfx
 __pycache__/
 *.py[cod]
 .pytest_cache/
-.pytest-tmp/
-.coverage
-htmlcov/
-.idea/
-.vscode/
-.DS_Store
-Thumbs.db
+.mypy_cache/
+.ruff_cache/
 
-# Runtime data may contain user images, masks and provider responses.
-data/*
-!data/projects/
-data/projects/*
-!data/projects/.gitkeep
-data/.secrets/
-outputs/
-runs/
-
-# Credentials and private keys must never be committed.
-*.pem
-*.key
-*.p12
-*.pfx
-id_rsa*
-id_ed25519*
-ssh_config
-credentials*.json
-secrets*.json
